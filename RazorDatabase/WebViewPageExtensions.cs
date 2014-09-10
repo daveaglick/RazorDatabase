@@ -10,7 +10,7 @@ using System.Web;
 using System.Web.Mvc;
 using System.Web.Routing;
 using System.Web.WebPages;
-using ReflectionMagic;
+using System.Reflection;
 
 namespace RazorDatabase
 {
@@ -26,27 +26,37 @@ namespace RazorDatabase
 
         public static string Render(this WebViewPage view, HttpContextBase httpContext, object model = null)
         {
-            var writer = new StringWriter();
+            StringWriter writer = new StringWriter();
             view.Initialize(httpContext, writer);
             view.ViewData.Model = model;
-            var webPageContext = new WebPageContext(view.ViewContext.HttpContext, null, model);
+            WebPageContext webPageContext = new WebPageContext(view.ViewContext.HttpContext, null, model);
 
             // Using private reflection to access some internals
             // Also make sure the use the same writer used for initializing the ViewContext in the OutputStack
-            // Note: ideally we would not have to do this, but WebPages is just not mockable enough :(
-            var dynamicPageContext = webPageContext.AsDynamic();
-            dynamicPageContext.OutputStack.Push(writer);            
+            // Note: ideally we would not have to do this, but WebPages is just not mockable enough :( 
+
+            // Add the writer to the output stack
+            PropertyInfo outputStackProp = typeof(WebPageContext).GetProperty("OutputStack", BindingFlags.Instance | BindingFlags.NonPublic);
+            Stack<TextWriter> outputStack = (Stack<TextWriter>)outputStackProp.GetValue(webPageContext, null);
+            outputStack.Push(writer);
 
             // Push some section writer dictionary onto the stack. We need two, because the logic in WebPageBase.RenderBody
             // checks that as a way to make sure the layout page is not called directly
-            var sectionWriters = new Dictionary<string, SectionWriter>(StringComparer.OrdinalIgnoreCase);
-            dynamicPageContext.SectionWritersStack.Push(sectionWriters);
-            dynamicPageContext.SectionWritersStack.Push(sectionWriters);
+            PropertyInfo sectionWritersStackProp = typeof(WebPageContext).GetProperty("SectionWritersStack", BindingFlags.Instance | BindingFlags.NonPublic);
+            Stack<Dictionary<string, SectionWriter>> sectionWritersStack = (Stack<Dictionary<string, SectionWriter>>)sectionWritersStackProp.GetValue(webPageContext, null);
+            Dictionary<string, SectionWriter> sectionWriters = new Dictionary<string, SectionWriter>(StringComparer.OrdinalIgnoreCase);
+            sectionWritersStack.Push(sectionWriters);
+            sectionWritersStack.Push(sectionWriters);
 
             // Set the body delegate to do nothing
-            dynamicPageContext.BodyAction = (Action<TextWriter>)(w => { });
+            PropertyInfo bodyActionProp = typeof(WebPageContext).GetProperty("BodyAction", BindingFlags.Instance | BindingFlags.NonPublic);
+            bodyActionProp.SetValue(webPageContext, (Action<TextWriter>)(w => { }), null);
 
-            view.AsDynamic().PageContext = webPageContext;
+            // Set the page context on the view (the property is public, but the setter is internal)
+            PropertyInfo pageContextProp = typeof(WebPageRenderingBase).GetProperty("PageContext", BindingFlags.Instance | BindingFlags.Public);
+            pageContextProp.SetValue(view, webPageContext, BindingFlags.NonPublic, null, null, null);
+
+            // Execute/render the view
             view.Execute();
 
             return writer.ToString();
@@ -55,9 +65,9 @@ namespace RazorDatabase
         private static void Initialize(this WebViewPage view, HttpContextBase httpContext, TextWriter writer)
         {
             //EnsureViewEngineRegistered();
-            var context = httpContext ?? new DummyHttpContext();
-            var routeData = new RouteData();
-            var controllerContext = new ControllerContext(context, routeData, new DummyController());
+            HttpContextBase context = httpContext ?? new DummyHttpContext();
+            RouteData routeData = new RouteData();
+            ControllerContext controllerContext = new ControllerContext(context, routeData, new DummyController());
             view.ViewContext = new ViewContext(controllerContext, new DummyView(), view.ViewData, new TempDataDictionary(), writer);
             view.InitHelpers();
         }

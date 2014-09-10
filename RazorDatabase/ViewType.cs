@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -87,9 +88,11 @@ namespace RazorDatabase
             {
                 try
                 {
-                    foreach (Type viewType in assembly.GetTypes().Where(x => typeof(TViewPage).IsAssignableFrom(x) && GetView(x)))
+                    foreach (Type viewPageType in assembly.GetTypes().Where(x => typeof(TViewPage).IsAssignableFrom(x) && GetView(x)))
                     {
-                        views.Add((TViewPage)Activator.CreateInstance(viewType));
+                        views.Add((TViewPage)Expression.Lambda<Func<object>>(
+                            Expression.Convert(Expression.New(viewPageType), typeof(object)))
+                            .Compile()());
                     }
                 }
                 catch (Exception)

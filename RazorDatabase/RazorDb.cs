@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web.Hosting;
 using Newtonsoft.Json.Bson;
+using System.Linq.Expressions;
 
 namespace RazorDatabase
 {
@@ -25,9 +26,9 @@ namespace RazorDatabase
         /// This initializes RazorDatabase. Typically this involves finding ViewType classes, instantiating them,
         /// optionally rendering the corresponding views, mapping properties, and storing the results.
         /// </summary>
-        /// <param name="persist">Set to true to persist the results of initialization to a file in App_data. This
+        /// <param name="cacheToDisk">Set to true to cacheToDisk the results of initialization to a file in App_data. This
         /// will speed up initialization on application restart.</param>
-        public static void Initialize(bool persist = true)
+        public static void Initialize(bool cacheToDisk = true)
         {
             // Reflect over all loaded assemblies looking for ViewType objects
             HashSet<Type> viewTypes = new HashSet<Type>();
@@ -54,8 +55,8 @@ namespace RazorDatabase
             }
             JsonSerializer serializer = new JsonSerializer();
 
-            // Check for existing persisted data if requested
-            if (persist)
+            // Check for existing cached data if requested
+            if (cacheToDisk)
             {
                 foreach (Type viewType in viewTypes.ToArray())
                 {
@@ -69,10 +70,10 @@ namespace RazorDatabase
                             {
                                 using (BinaryReader binaryReader = new BinaryReader(stream))
                                 {
-                                    // Make sure the persisted version is the same as the current version
-                                    int persistedAssemblyHash = binaryReader.ReadInt32();
+                                    // Make sure the cached version is the same as the current version
+                                    int cachedAssemblyHash = binaryReader.ReadInt32();
                                     int assemblyHash = viewType.Assembly.GetHashCode();
-                                    if (persistedAssemblyHash == assemblyHash)
+                                    if (cachedAssemblyHash == assemblyHash)
                                     {
                                         // Need to set the readRootValueAsArray flag - see http://stackoverflow.com/questions/16910369/bson-array-deserialization-with-json-net
                                         using (JsonReader jsonReader = new BsonReader(binaryReader, true, DateTimeKind.Utc))
@@ -99,29 +100,35 @@ namespace RazorDatabase
 
             // Render the remaining view types
             List<Tuple<Type, Array>> toSerialize = new List<Tuple<Type, Array>>();
-            foreach (Type viewType in viewTypes)
+            foreach (Type viewTypeType in viewTypes)
             {
+                // Get a function for object instantiation
+                Func<object> createViewType = Expression.Lambda<Func<object>>(
+                    Expression.Convert(Expression.New(viewTypeType), typeof(object)))
+                    .Compile();
+
                 ConcurrentBag<IInternalViewType> bag = new ConcurrentBag<IInternalViewType>();
-                IInternalViewType getViews = (IInternalViewType)Activator.CreateInstance(viewType);
-                foreach (WebViewPage view in getViews.GetViews())
+                IInternalViewType viewType = (IInternalViewType)createViewType();
+                IEnumerable<WebViewPage> webViewPages = viewType.GetViews();
+                foreach (WebViewPage webViewPage in webViewPages)
                 {
-                    IInternalViewType instance = (IInternalViewType)Activator.CreateInstance(viewType);
-                    object model = instance.GetModel(view);
-                    string rendered = view.Render(model);
-                    instance.SetViewTypeName(view.GetType().Name);
-                    instance.SetRenderedContent(rendered);
-                    instance.MapProperties(view);
-                    bag.Add(instance);
+                    viewType = (IInternalViewType)createViewType();
+                    object model = viewType.GetModel(webViewPage);
+                    viewType.SetViewTypeName(webViewPage.GetType().Name);
+                    string rendered = viewType.ShouldRender(webViewPage, webViewPages) ? webViewPage.Render(model) : string.Empty;
+                    viewType.SetRenderedContent(rendered);
+                    viewType.MapProperties(webViewPage);
+                    bag.Add(viewType);
                 }
                 if (bag.Count > 0)
                 {
-                    toSerialize.Add(new Tuple<Type, Array>(viewType, bag.ToArray()));
+                    toSerialize.Add(new Tuple<Type, Array>(viewTypeType, bag.ToArray()));
                 }
-                _viewTypes.TryAdd(viewType, bag);
+                _viewTypes.TryAdd(viewTypeType, bag);
             }
 
             // Serialize the view types that we rendered, if requested
-            if (persist)
+            if (cacheToDisk)
             {
                 foreach (Tuple<Type, Array> serialize in toSerialize)
                 {
