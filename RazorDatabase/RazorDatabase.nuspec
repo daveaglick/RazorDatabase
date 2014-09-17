@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>RazorDatabase</id>
+    <version>0.0.0</version>
+    <title>RazorGenerator</title>
+    <authors>somedave</authors>
+    <owners>somedave</owners>
+    <licenseUrl>https://github.com/somedave/RazorDatabase/blob/master/license.txt</licenseUrl>
+    <projectUrl>http://somedave.com/razordatabase</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>An in-memory collection populated by Razor views and custom metadata.</description>
+    <releaseNotes>Initial release.</releaseNotes>
+    <copyright>Copyright 2014</copyright>
+    <tags>mvc razor asp.net</tags>
+  </metadata>
+</package>
