@@ -10,7 +10,6 @@
     <projectUrl>http://somedave.com/razordatabase</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>An in-memory collection populated by Razor views and custom metadata.</description>
-    <releaseNotes>Initial release.</releaseNotes>
     <copyright>Copyright 2014</copyright>
     <tags>mvc razor asp.net</tags>
   </metadata>
