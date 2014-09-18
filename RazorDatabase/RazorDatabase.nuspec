@@ -2,10 +2,10 @@
 <package >
   <metadata>
     <id>RazorDatabase</id>
-    <version>0.0.0</version>
+    <version>$version$</version>
     <title>RazorGenerator</title>
-    <authors>somedave</authors>
-    <owners>somedave</owners>
+    <authors>Dave Glick</authors>
+    <owners>Dave Glick</owners>
     <licenseUrl>https://github.com/somedave/RazorDatabase/blob/master/license.txt</licenseUrl>
     <projectUrl>http://somedave.com/razordatabase</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
