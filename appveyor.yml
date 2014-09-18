@@ -22,4 +22,4 @@ after_test:
 artifacts:
   - path: RazorDatabase\bin\Release\RazorDatabase.dll
     name: RazorDatabase.dll
-  - path: 'RazorDatabase\*.nupkg'
+  - path: '**\RazorDatabase.*.nupkg'
