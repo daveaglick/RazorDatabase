@@ -172,6 +172,12 @@ namespace RazorDatabase
             {
                 get { return _items; }
             }
+
+            // This is needed in ASP.NET MVC 5
+            public override object GetService(Type serviceType)
+            {
+                return DependencyResolver.Current.GetService(serviceType);
+            }
         }
     }
 }
